@@ -176,7 +176,10 @@ def main():
                     new_top_block = tx_rate_btc_kvb >= topblock_rate_btc_kvb 
                     if new_top_block:
                         raw_tx = getrawtransaction(txid)
-                        tx_cache[txid] = raw_tx # cache the full tx in case it's replaced later
+                        # We need to cache if it's replaced later, since by the time
+                        # we are told it's replaced, it's already gone. Would be nice
+                        # to get it when it's replaced, or persist to disk, or whatever.
+                        tx_cache[txid] = raw_tx
 
                         for tx_input in raw_tx["vin"]:
                             prevout = (tx_input['txid'], tx_input['vout'])
@@ -218,10 +221,7 @@ def main():
 
                 # If this tx is in the tx_cache, that implies it was top block
                 # we need to see which utxos being non-top block once we see
-                # the next "A" to
-                # 1) increment utxo_unspent_count
-                # 2) if CYCLE_THRESH exceeded cache the replaced tx
-                # 3) resubmit cached tx for utxo
+                # the next "A"
                 # N.B. I am not sure at all the next "A" is actually a double-spend, that should be checked!
                 # I'm going off of functional tests.
                 if txid in tx_cache:
