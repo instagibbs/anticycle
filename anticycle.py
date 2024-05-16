@@ -118,6 +118,8 @@ def sendrawtransaction(txid):
         result = response.json()
         return result["result"]
     else:
+        # FIXME: return error, delete tx
+        # if inputs missing
         logging.info(f'Error: {response.status_code}')
         logging.info(response.text)
         return None
@@ -228,8 +230,8 @@ def main():
                 # We processed the double-spends, clear
                 utxos_being_doublespent.clear()
             elif label == "R":
-                logging.info(f"Tx {txid} replaced")
-                # This tx is replaced, next "A" message should be the tx replacing it(conflict_tx)
+                logging.info(f"Tx {txid} removed")
+                # This tx is removed, perhaps replaced, next "A" message should be the tx replacing it(conflict_tx)
 
                 # If this tx is in the tx_cache, that implies it was top block
                 # we need to see which utxos being non-top block once we see
