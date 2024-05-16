@@ -1,6 +1,7 @@
 from decimal import Decimal
 from collections import defaultdict
 import json
+import logging
 import os
 import requests
 from requests.auth import HTTPBasicAuth
@@ -17,6 +18,13 @@ if not rpc_user:
 
 if not rpc_password:
     raise Exception("Must set RPCPASS env variable to connect to Bitcoin Core RPC")
+
+# Configure logging settings
+logging.basicConfig(
+    level=logging.INFO,  # Set the logging level
+    format='%(asctime)s - %(message)s',  # Format to include timestamp
+    datefmt='%Y-%m-%d %H:%M:%S'  # Date format for the timestamp
+)
 
 # Replace with cluster mempool threshholds
 fee_url = 'https://mempool.space/api/v1/fees/recommended'
@@ -49,8 +57,8 @@ def getrawtransaction(txid):
         result = response.json()
         return result["result"]
     else:
-        print(f'Error: {response.status_code}')
-        print(response.text)
+        logging.info(f'Error: {response.status_code}')
+        logging.info(response.text)
         return None
 
 
@@ -80,8 +88,8 @@ def getmempoolentry(txid):
         result = response.json()
         return result["result"]
     else:
-        print(f'Error: {response.status_code}')
-        print(response.text)
+        logging.info(f'Error: {response.status_code}')
+        logging.info(response.text)
         return None
 
 def sendrawtransaction(txid):
@@ -110,8 +118,8 @@ def sendrawtransaction(txid):
         result = response.json()
         return result["result"]
     else:
-        print(f'Error: {response.status_code}')
-        print(response.text)
+        logging.info(f'Error: {response.status_code}')
+        logging.info(response.text)
         return None
 
 
@@ -119,6 +127,9 @@ def main():
     '''
     Best effort mempool syncing to detect replacement cycling attacks
     '''
+
+    logging.info("Starting anticycle")
+
     context = zmq.Context()
     
     # Create a socket of type SUBSCRIBE
@@ -132,7 +143,7 @@ def main():
     # You can specify a prefix filter here to receive specific messages
     socket.setsockopt_string(zmq.SUBSCRIBE, '')
     
-    print(f"Listening for messages on port {port}...")
+    logging.info(f"Listening for messages on port {port}...")
 
     # txid -> tx cache (FIXME do better than this)
     # We store these anytime above top block
@@ -152,7 +163,7 @@ def main():
     # utxo -> replaced tx's txid
     utxos_being_doublespent = {}
 
-    print("Getting Top Block fee")
+    logging.info("Getting Top Block fee")
     topblock_rate_sat_vb = requests.get(fee_url).json()["fastestFee"]
     topblock_rate_btc_kvb = Decimal(topblock_rate_sat_vb) * 1000 / 100000000
 
@@ -165,7 +176,7 @@ def main():
             label = chr(body[32])
 
             if label == "A":
-                print(f"Tx {txid} added")
+                logging.info(f"Tx {txid} added")
                 entry = getmempoolentry(txid)
                 if entry is not None:
                     if entry['ancestorcount'] != 1:
@@ -185,11 +196,11 @@ def main():
                             prevout = (tx_input['txid'], tx_input['vout'])
                             if prevout not in utxos_being_doublespent and prevout in utxo_cache:
                                 # Bottom->Top, clear cached transaction
-                                print(f"Deleting cache entry for {(tx_input['txid'], tx_input['vout'])}")
+                                logging.info(f"Deleting cache entry for {(tx_input['txid'], tx_input['vout'])}")
                                 del utxo_cache[prevout]
                             elif prevout in utxos_being_doublespent and prevout not in utxo_cache:
                                 if utxo_unspent_count[prevout] >= CYCLE_THRESH:
-                                    print(f"{prevout} has been RBF'd, caching {replaced_txid}", flush=True)
+                                    logging.info(f"{prevout} has been RBF'd, caching {replaced_txid}")
                                     # Top->Top, cache the replaced transaction
                                     utxo_cache[prevout] = tx_cache[utxos_being_doublespent[prevout]]
                                     del utxos_being_doublespent[prevout] # delete to detect Top->Bottom later
@@ -202,21 +213,22 @@ def main():
                                 utxo_unspent_count[prevout] += 1
 
                                 if utxo_unspent_count[prevout] >= CYCLE_THRESH:
-                                    print(f"{prevout} has been cycled {utxo_unspent_count[prevout]} times, maybe caching {replaced_txid}", flush=True)
+                                    logging.info(f"{prevout} has been cycled {utxo_unspent_count[prevout]} times, maybe caching {replaced_txid}")
                                     # cache replaced tx if nothing cached for this utxo
                                     if prevout not in utxo_cache:
-                                        print(f"cached {replaced_txid}!")
+                                        logging.info(f"cached {replaced_txid}!")
                                         utxo_cache[prevout] = tx_cache[replaced_txid]
 
                                 # resubmit cached utxo tx
                                 send_ret = sendrawtransaction(utxo_cache[prevout]["hex"])
                                 if send_ret:
-                                    print(f"Successfully resubmitted {send_ret}")
+                                    logging.info(f"Successfully resubmitted {send_ret}")
+                                    logging.info(f"rawhex: {utxo_cache[prevout]['hex']}")
 
                 # We processed the double-spends, clear
                 utxos_being_doublespent.clear()
             elif label == "R":
-                print(f"Tx {txid} replaced", flush=True)
+                logging.info(f"Tx {txid} replaced")
                 # This tx is replaced, next "A" message should be the tx replacing it(conflict_tx)
 
                 # If this tx is in the tx_cache, that implies it was top block
@@ -229,10 +241,10 @@ def main():
                         utxos_being_doublespent[(tx_input["txid"], tx_input["vout"])] = txid
 
             elif label == "C" or label == "D":
-                print(f"Block tip changed", flush=True)
+                logging.info(f"Block tip changed")
                 # FIXME do something smarter, for now we just hope this isn't hit on short timeframes
                 if len(tx_cache) > 10000:
-                    print(f"wiping state", flush=True)
+                    logging.info(f"wiping state")
                     utxo_cache.clear()
                     utxo_unspent_count.clear()
                     utxos_being_doublespent.clear()
@@ -240,7 +252,7 @@ def main():
                 topblock_rate_sat_vb = requests.get(fee_url).json()["fastestFee"]
                 topblock_rate_btc_kvb = Decimal(topblock_rate_sat_vb) * 1000 / 100000000
     except KeyboardInterrupt:
-        print("Program interrupted by user")
+        logging.info("Program interrupted by user")
     finally:
         # Clean up on exit
         socket.close()
