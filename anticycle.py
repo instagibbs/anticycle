@@ -6,6 +6,7 @@ import os
 import requests
 from requests.auth import HTTPBasicAuth
 import struct
+import sys
 import zmq
 
 rpc_user = os.environ.get('RPCUSER')
@@ -21,9 +22,10 @@ if not rpc_password:
 
 # Configure logging settings
 logging.basicConfig(
-    level=logging.INFO,  # Set the logging level
-    format='%(asctime)s - %(message)s',  # Format to include timestamp
-    datefmt='%Y-%m-%d %H:%M:%S'  # Date format for the timestamp
+    stream=sys.stdout,
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 
 # Replace with cluster mempool threshholds
