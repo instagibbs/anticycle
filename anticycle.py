@@ -271,6 +271,7 @@ def main():
             elif label == "C" or label == "D":
                 logging.info(f"Block tip changed")
                 # FIXME do something smarter, for now we just hope this isn't hit on short timeframes
+                # Defender will have to resubmit enough again to be protected for the new period
                 if tx_cache_byte_size > tx_cache_max_byte_size:
                     logging.info(f"wiping state")
                     utxo_cache.clear()

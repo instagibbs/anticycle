@@ -21,3 +21,13 @@ flowchart TD
     A -->|evicted chunk\ncached\nif empty,\ntry resubmitting\ncached| B(UTXO spend NOT in Top Block)
     B -->|clear cache for utxo| A
 ```
+
+TODO: Figure out more comprehensive anti-DoS story against
+an attacker simply churning the cache with incremental RBFs:
+
+1. Only cache full tx when CYCLE_THRESH breached, vs simply being added
+ - utxo as anti-DoS?
+ - requires some other publication mechanism?
+2. Increase CYCLE_THRESH, for multiplicative security (costing attacker more per slot)
+3. Increase max memory usage X times, for multiplicative security
+4. Cache to disk for additional security
