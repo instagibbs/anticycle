@@ -164,7 +164,7 @@ def main():
     # These are populated by "R" events and cleared in
     # subsequent "A" events. These are to track
     # top->nontop transitions
-    # utxo -> replaced tx's txid
+    # utxo -> removed tx's txid
     utxos_being_doublespent = {}
 
     logging.info("Getting Top Block fee")
@@ -191,9 +191,9 @@ def main():
                     new_top_block = tx_rate_btc_kvb >= topblock_rate_btc_kvb 
                     if new_top_block:
                         raw_tx = getrawtransaction(txid)
-                        # We need to cache if it's replaced later, since by the time
-                        # we are told it's replaced, it's already gone. Would be nice
-                        # to get it when it's replaced, or persist to disk, or whatever.
+                        # We need to cache if it's removed later, since by the time
+                        # we are told it's removed, it's already gone. Would be nice
+                        # to get it when it's removed, or persist to disk, or whatever.
                         tx_cache[txid] = raw_tx
 
                         for tx_input in raw_tx["vin"]:
@@ -204,24 +204,24 @@ def main():
                                 del utxo_cache[prevout]
                             elif prevout in utxos_being_doublespent and prevout not in utxo_cache:
                                 if utxo_unspent_count[prevout] >= CYCLE_THRESH:
-                                    logging.info(f"{prevout} has been RBF'd, caching {replaced_txid}")
-                                    # Top->Top, cache the replaced transaction
+                                    logging.info(f"{prevout} has been RBF'd, caching {removed_txid}")
+                                    # Top->Top, cache the removed transaction
                                     utxo_cache[prevout] = tx_cache[utxos_being_doublespent[prevout]]
                                     del utxos_being_doublespent[prevout] # delete to detect Top->Bottom later
 
                     # Handle Top->Bottom: top utxos gone unspent
                     if len(utxos_being_doublespent) > 0:
-                        # things were double-spent and not replaced with top block
-                        for prevout, replaced_txid in utxos_being_doublespent.items():
-                            if replaced_txid in tx_cache:
+                        # things were double-spent and not removed with top block
+                        for prevout, removed_txid in utxos_being_doublespent.items():
+                            if removed_txid in tx_cache:
                                 utxo_unspent_count[prevout] += 1
 
                                 if utxo_unspent_count[prevout] >= CYCLE_THRESH:
-                                    logging.info(f"{prevout} has been cycled {utxo_unspent_count[prevout]} times, maybe caching {replaced_txid}")
-                                    # cache replaced tx if nothing cached for this utxo
+                                    logging.info(f"{prevout} has been cycled {utxo_unspent_count[prevout]} times, maybe caching {removed_txid}")
+                                    # cache removed tx if nothing cached for this utxo
                                     if prevout not in utxo_cache:
-                                        logging.info(f"cached {replaced_txid}!")
-                                        utxo_cache[prevout] = tx_cache[replaced_txid]
+                                        logging.info(f"cached {removed_txid}")
+                                        utxo_cache[prevout] = tx_cache[removed_txid]
 
                                 # resubmit cached utxo tx
                                 send_ret = sendrawtransaction(utxo_cache[prevout]["hex"])
@@ -233,7 +233,7 @@ def main():
                 utxos_being_doublespent.clear()
             elif label == "R":
                 logging.info(f"Tx {txid} removed")
-                # This tx is removed, perhaps replaced, next "A" message should be the tx replacing it(conflict_tx)
+                # This tx is removed, perhaps removed, next "A" message should be the tx replacing it(conflict_tx)
 
                 # If this tx is in the tx_cache, that implies it was top block
                 # we need to see which utxos being non-top block once we see
