@@ -31,6 +31,10 @@ logging.basicConfig(
 # Replace with cluster mempool threshholds
 fee_url = 'https://mempool.space/api/v1/fees/recommended'
 
+# How many times a utxo has to go from Top->Bottom to be
+# have its spending tx cached(if otherwise empty)
+# Increasing this value reducs false positive rates
+# and reduces memory usage accordingly.
 CYCLE_THRESH = 1
 
 def getrawtransaction(txid):
@@ -153,9 +157,25 @@ def main():
     # We store these anytime above top block
     # when real implementation would have access
     # to these when being evicted from the mempool
+    # so we would only have to store in utxo_cache instead
     tx_cache = {}
 
+    # Track total serialized size in bytesof the things we are caching
+    # and use this as trigger for flushing.
+    tx_cache_byte_size = 0
+
+    # ~10 full size blocks worth of cache
+    # Note the attacker can simply be incrementally RBFing through that much
+    # size after paying once for "top block".
+    # Having just in time access to something being evicted is what
+    # we really want but for now we'll just roughly count what we're storing.
+    # FIXME if we're going with this wiping window, maybe make it less
+    # deterministic to avoid completely predictable windows. Does this matter?
+    tx_cache_max_byte_size = 4000000*10
+
     # utxo -> tx_spending_utxo cache (FIXME don't store spending tx N times)
+    # this is the real bottleneck in terms of space if we had access to the
+    # transactions being evicted.
     utxo_cache = {}
 
     # utxo -> count of topblock->nontopblock transitions
@@ -179,6 +199,9 @@ def main():
             txid = body[:32].hex()
             label = chr(body[32])
 
+            if received_seq % 100 == 0:
+                logging.info(f"Transactions cached: {len(tx_cache)}, bytes cached: {tx_cache_byte_size}, topblock rate: {topblock_rate_sat_vb}")
+
             if label == "A":
                 logging.info(f"Tx {txid} added")
                 entry = getmempoolentry(txid)
@@ -195,6 +218,7 @@ def main():
                         # we are told it's removed, it's already gone. Would be nice
                         # to get it when it's removed, or persist to disk, or whatever.
                         tx_cache[txid] = raw_tx
+                        tx_cache_byte_size += int(len(raw_tx["hex"]) / 2)
 
                         for tx_input in raw_tx["vin"]:
                             prevout = (tx_input['txid'], tx_input['vout'])
@@ -233,7 +257,7 @@ def main():
                 utxos_being_doublespent.clear()
             elif label == "R":
                 logging.info(f"Tx {txid} removed")
-                # This tx is removed, perhaps removed, next "A" message should be the tx replacing it(conflict_tx)
+                # This tx is removed, perhaps replaced, next "A" message should be the tx replacing it(conflict_tx)
 
                 # If this tx is in the tx_cache, that implies it was top block
                 # we need to see which utxos being non-top block once we see
@@ -247,12 +271,13 @@ def main():
             elif label == "C" or label == "D":
                 logging.info(f"Block tip changed")
                 # FIXME do something smarter, for now we just hope this isn't hit on short timeframes
-                if len(tx_cache) > 10000:
+                if tx_cache_byte_size > tx_cache_max_byte_size:
                     logging.info(f"wiping state")
                     utxo_cache.clear()
                     utxo_unspent_count.clear()
                     utxos_being_doublespent.clear()
                     tx_cache.clear()
+                    tx_cache_byte_size = 0
                 topblock_rate_sat_vb = requests.get(fee_url).json()["fastestFee"]
                 topblock_rate_btc_kvb = Decimal(topblock_rate_sat_vb) * 1000 / 100000000
     except KeyboardInterrupt:
