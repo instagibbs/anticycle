@@ -171,11 +171,11 @@ def main():
     # we really want but for now we'll just roughly count what we're storing.
     # FIXME if we're going with this wiping window, maybe make it less
     # deterministic to avoid completely predictable windows. Does this matter?
-    tx_cache_max_byte_size = 4000000*10
+    tx_cache_max_byte_size = 50 * 1000 * 1000
 
-    # utxo -> tx_spending_utxo cache (FIXME don't store spending tx N times)
-    # this is the real bottleneck in terms of space if we had access to the
-    # transactions being evicted.
+    # utxo -> protected-txid cache
+    # this would the real bottleneck in terms of space if we had access to the
+    # transactions being evicted. We don't so for now full tx are in tx_cache
     utxo_cache = {}
 
     # utxo -> count of topblock->nontopblock transitions
@@ -230,7 +230,7 @@ def main():
                                 if utxo_unspent_count[prevout] >= CYCLE_THRESH:
                                     logging.info(f"{prevout} has been RBF'd, caching {removed_txid}")
                                     # Top->Top, cache the removed transaction
-                                    utxo_cache[prevout] = tx_cache[utxos_being_doublespent[prevout]]
+                                    utxo_cache[prevout] = utxos_being_doublespent[prevout]
                                     del utxos_being_doublespent[prevout] # delete to detect Top->Bottom later
 
                     # Handle Top->Bottom: top utxos gone unspent
@@ -245,13 +245,14 @@ def main():
                                     # cache removed tx if nothing cached for this utxo
                                     if prevout not in utxo_cache:
                                         logging.info(f"cached {removed_txid}")
-                                        utxo_cache[prevout] = tx_cache[removed_txid]
+                                        utxo_cache[prevout] = removed_txid
 
                                 # resubmit cached utxo tx
-                                send_ret = sendrawtransaction(utxo_cache[prevout]["hex"])
+                                raw_tx = tx_cache[utxo_cache[prevout]]["hex"]
+                                send_ret = sendrawtransaction(raw_tx)
                                 if send_ret:
                                     logging.info(f"Successfully resubmitted {send_ret}")
-                                    logging.info(f"rawhex: {utxo_cache[prevout]['hex']}")
+                                    logging.info(f"rawhex: {raw_tx}")
 
                 # We processed the double-spends, clear
                 utxos_being_doublespent.clear()
