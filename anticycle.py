@@ -14,6 +14,11 @@ rpc_password = os.environ.get('RPCPASS')
 rpc_host = '127.0.0.1'
 rpc_port = 8332
 
+if len(sys.argv) != 2:
+    raise Exception("Must pass in number of MB for transaction cache")
+
+num_MB = int(sys.argv[1])
+
 if not rpc_user:
     raise Exception("Must set RPCUSER env variable to connect to Bitcoin Core RPC")
 
@@ -164,14 +169,13 @@ def main():
     # and use this as trigger for flushing.
     tx_cache_byte_size = 0
 
-    # ~10 full size blocks worth of cache
     # Note the attacker can simply be incrementally RBFing through that much
     # size after paying once for "top block".
     # Having just in time access to something being evicted is what
     # we really want but for now we'll just roughly count what we're storing.
     # FIXME if we're going with this wiping window, maybe make it less
     # deterministic to avoid completely predictable windows. Does this matter?
-    tx_cache_max_byte_size = 50 * 1000 * 1000
+    tx_cache_max_byte_size = num_MB * 1000 * 1000
 
     # utxo -> protected-txid cache
     # this would the real bottleneck in terms of space if we had access to the
@@ -200,7 +204,7 @@ def main():
             label = chr(body[32])
 
             if received_seq % 100 == 0:
-                logging.info(f"Transactions cached: {len(tx_cache)}, bytes cached: {tx_cache_byte_size}, topblock rate: {topblock_rate_sat_vb}")
+                logging.info(f"Transactions cached: {len(tx_cache)}, bytes cached: {tx_cache_byte_size/1000000}/{num_MB}MB, topblock rate: {topblock_rate_sat_vb}")
 
             if label == "A":
                 logging.info(f"Tx {txid} added")
