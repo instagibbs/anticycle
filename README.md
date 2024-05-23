@@ -26,7 +26,7 @@ TODO: Figure out more comprehensive anti-DoS story against
 an attacker simply churning the cache with incremental RBFs:
 
 1. Only cache full tx when CYCLE_THRESH breached, vs simply being added
- - utxo as anti-DoS?
+ - only cache tx if it doesn't conflict with any other tx in cache
  - requires some other publication mechanism?
 2. Increase CYCLE_THRESH, for multiplicative security (costing attacker more per slot)
 3. Increase max memory usage X times, for multiplicative security
