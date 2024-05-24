@@ -218,6 +218,9 @@ def main():
                     new_top_block = tx_rate_btc_kvb >= topblock_rate_btc_kvb 
                     if new_top_block:
                         raw_tx = getrawtransaction(txid)
+                        # Might have already been evicted/mined/etc
+                        if raw_tx is None:
+                            continue
                         # We need to cache if it's removed later, since by the time
                         # we are told it's removed, it's already gone. Would be nice
                         # to get it when it's removed, or persist to disk, or whatever.
