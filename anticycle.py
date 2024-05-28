@@ -294,6 +294,8 @@ def main():
                                     utxo_cache[prevout] = removed_txid
                                     cycled_tx_cache[removed_txid] = removed_tx
                                     cycled_tx_cache_size += len(cycled_tx_cache[utxo_cache[prevout]]["hex"]) / 2
+                                    for removed_prevout in removed_prevouts:
+                                        cycled_input_set.add(removed_prevout)
                                 else:
                                     logging.info(f"{removed_txid} is not being cached due to conflicts in input cache")
                             del utxos_being_doublespent[prevout] # delete to detect Top->Bottom later
