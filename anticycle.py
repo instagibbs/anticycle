@@ -251,10 +251,12 @@ def main():
                 logging.info(f"Tx {txid} added")
                 entry = getmempoolentry(txid)
                 if entry is None:
+                    utxos_being_doublespent.clear()
                     continue
                 if entry['ancestorcount'] != 1:
                     # Only supporting singletons for now ala HTLC-X transactions
                     # Can extend to 1P1C pretty easily.
+                    utxos_being_doublespent.clear()
                     continue
 
                 tx_rate_btc_kvb = Decimal(entry['fees']['ancestor']) / entry['ancestorsize'] * 1000
@@ -263,6 +265,7 @@ def main():
                     raw_tx = getrawtransaction(txid)
                     # Might have already been evicted/mined/etc
                     if raw_tx is None:
+                        utxos_being_doublespent.clear()
                         continue
                     tx_bytes = bytes.fromhex(raw_tx["hex"])
 
