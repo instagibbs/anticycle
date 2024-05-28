@@ -33,9 +33,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Replace with cluster mempool threshholds
-fee_url = 'https://mempool.space/api/v1/fees/recommended'
-
 # How many times a utxo has to go from Top->Bottom to be
 # have its spending tx cached(if otherwise empty)
 # Increasing this value reducs false positive rates
@@ -301,7 +298,7 @@ def main():
                                         cycled_input_set.add(removed_prevout)
                                 else:
                                     logging.info(f"{removed_txid} is not being cached due to conflicts in input cache")
-                            del utxos_being_doublespent[prevout] # delete to detect Top->Bottom later
+                            del utxos_being_doublespent[prevout] # delete to detect remaining Top->Bottom later
 
                     # Handle Top->Bottom: There are top block spends now unspent!
                     if len(utxos_being_doublespent) > 0:
@@ -309,6 +306,7 @@ def main():
                         for unspent_prevout, _ in utxos_being_doublespent.items():
                             # Count it first
                             utxo_cycled_count[unspent_prevout] += 1
+                            logging.info(f"{unspent_prevout} has been cycled {utxo_cycled_count[unspent_prevout]} times")
 
                             # If we have something cached, it might be free to re-enter now
                             if unspent_prevout in utxo_cache and utxo_cache[unspent_prevout] in cycled_tx_cache:
