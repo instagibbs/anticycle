@@ -18,7 +18,7 @@ threshhold.
 ```mermaid
 flowchart TD
     A(UTXO Spend in Top Block) -->|evicted chunk\ncached\nif empty| A
-    A -->|evicted chunk\ncached\nif empty,\ntry resubmitting\ncached| B(UTXO spend NOT in Top Block)
+    A -->|increment spent-unspent counter,\ntry resubmitting\ncached| B(UTXO spend NOT in Top Block)
     B -->|clear cache for utxo| A
 ```
 
