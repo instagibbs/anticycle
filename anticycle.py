@@ -278,9 +278,13 @@ def main():
                             # Bottom->Top, clear cached transaction if any
                             if prevout in utxo_cache:
                                 logging.info(f"Deleting cache entry for {(tx_input['txid'], tx_input['vout'])}")
-                                cycled_tx_cache_size -= len(cycled_tx_cache[utxo_cache[prevout]])
+                                deleted_prevouts = [(tx_input['txid'], tx_input['vout']) for tx_input in cycled_tx_cache[utxo_cache[prevout]]["vin"]]
+                                cycled_tx_cache_size -= len(cycled_tx_cache[utxo_cache[prevout]]["hex"]) / 2
                                 del cycled_tx_cache[utxo_cache[prevout]]
                                 del utxo_cache[prevout]
+                                for deleted_prevout in deleted_prevouts:
+                                    if deleted_prevout in cycled_input_set:
+                                        cycled_input_set.remove(deleted_prevout)
                         else:
                             # Top->Top, cache if entry is empty
                             if prevout not in utxo_cache and utxo_cycled_count[prevout] >= CYCLE_THRESH:
