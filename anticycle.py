@@ -250,12 +250,10 @@ def main():
                 if entry is None:
                     utxos_being_doublespent.clear()
                     continue
-                if entry['ancestorcount'] != 1:
-                    # Only supporting singletons for now ala HTLC-X transactions
-                    # Can extend to 1P1C pretty easily.
-                    utxos_being_doublespent.clear()
-                    continue
-
+                # We are allowing "packages" of ancestors.
+                # What we really want is the mempool entry's chunk feerate.
+                # And we actually don't want to track in-mempool utxos, only
+                # confirmed.
                 tx_rate_btc_kvb = Decimal(entry['fees']['ancestor']) / entry['ancestorsize'] * 1000
                 new_top_block = tx_rate_btc_kvb >= topblock_rate_btc_kvb 
                 if new_top_block:

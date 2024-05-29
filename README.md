@@ -30,3 +30,6 @@ an attacker simply churning the cache with incremental RBFs:
 2. Increase CYCLE_THRESH, for multiplicative security (costing attacker more per slot)
 3. Increase max memory usage X times, for multiplicative security
 4. Cache to disk for additional security
+
+Branch in warnet which is actually being tested:
+https://github.com/instagibbs/warnet/commits/2024-05-28-instagibbs-demo/
